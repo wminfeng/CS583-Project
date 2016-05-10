@@ -3,8 +3,6 @@ module RobotSimulation where
 import Control.Monad
 import Control.Monad.State 
 import Control.Monad.Trans
-
-
 --sem :: Move -> Pos
 --sem []          = (0,0)
 --sem (Go d i:ms) = (dx*i+x,dy*i+y) 
