@@ -87,6 +87,34 @@ printSchedule = do
   (_,_,_,s) <- get
   lift $ putStrLn (show s)
 
+addAction :: Monad m => Action -> Robot m ()
+addAction a = do
+  (e,p,l,s) <- get
+  put (e,p,l,(s ++ [a]))
+  return ()
+
+-- popAction :: Monad m => Robot m (Maybe Action)
+-- popAction s = let s = getSchedule in
+--                     case s of
+--                       [] -> Nothing
+--                       _  -> do
+--                         h <- head s
+--                         return Just h
+--
+-- getNextAction :: State -> Maybe Action
+-- getNextAction s = let actionList = (actionQueue s) in
+--                       case actionList of
+--                         [] -> Nothing
+--                         _  -> Just (head actionList)
+--
+--
+-- removeTopAction :: State -> State
+-- removeTopAction s = let actionList = (actionQueue s) in
+--                           case actionList of
+--                             [] -> s
+--                             _  -> let updateActionQueue q = q { actionQueue = tail (actionQueue s)} in
+--                               updateActionQueue s
+
 --example = put (0,(0,0),Sand,[Pickup]) >> printSchedule
 
 --getfunc :: Robot IO ()
