@@ -25,6 +25,7 @@ data Action = Moveto Int Int
       | GetPressure
       | GetPicture
       | SendBackdata
+      | DoNothing
       | Seq Action Action
       | If Object Action deriving (Show,Eq)
 data Object = Sand | Stone deriving (Show,Eq)
@@ -77,11 +78,17 @@ printLoad = do
   (_,_,l,_) <- get
   lift $ putStrLn (show l)
 
+setSchedule :: Monad m => Schedule -> Robot m ()
+setSchedule s = do
+  (e,p,l,_) <- get
+  put (e,p,l,s)
+
 getSchedule :: Monad m => Robot m Schedule
 getSchedule = do
   (_,_,_,s) <- get
   return s
 
+--TODO fix this
 printSchedule :: Robot IO ()
 printSchedule = do
   (_,_,_,s) <- get
@@ -93,11 +100,25 @@ addAction a = do
   put (e,p,l,(s ++ [a]))
   return ()
 
--- popAction :: Monad m => Robot m (Maybe Action)
--- popAction = let s = getSchedule in
---                     case s of
---                       [] -> Nothing
---                       _  -> do
---                         h <- Just (head s)
---                         --TODO: Remove the top element from the schedule
---                         h
+peekAction :: Monad m => Robot m Action
+peekAction = do
+  s <- getSchedule
+  case s of
+    [] -> return DoNothing
+    _  -> return (head s)
+
+removeTopAction :: Monad m => Robot m ()
+removeTopAction = do
+  s <- getSchedule
+  case s of
+    [] -> return ()
+    _ -> setSchedule (tail s)
+
+popAction :: Monad m => Robot m (Maybe Action)
+popAction = let s = getSchedule in
+              case s of
+                [] -> Nothing
+                _  -> do
+                  h <- Just (head s)
+                  --TODO: Remove the top element from the schedule
+                  h
