@@ -114,11 +114,11 @@ removeTopAction = do
     [] -> return ()
     _ -> setSchedule (tail s)
 
-popAction :: Monad m => Robot m (Maybe Action)
-popAction = let s = getSchedule in
-              case s of
-                [] -> Nothing
-                _  -> do
-                  h <- Just (head s)
-                  --TODO: Remove the top element from the schedule
-                  h
+-- popAction :: Monad m => Robot m (Maybe Action)
+-- popAction = let s = getSchedule in
+--               case s of
+--                 [] -> Nothing
+--                 _  -> do
+--                   h <- Just (head s)
+--                   --TODO: Remove the top element from the schedule
+--                   h
