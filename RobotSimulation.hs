@@ -17,6 +17,9 @@ import Control.Monad.Trans
 --vector Up  = (0,1)
 --vector Dwn = (0,-1)
 
+
+-- ToDo: Based on the combinator pattern in our lecture, this should be changed to funtions that return "Robot m a" as results
+-- Reason: Such implemetation lacks of extensibility
 data Action = Moveto Int Int
       | Pickup
       | Drop
@@ -28,7 +31,7 @@ data Action = Moveto Int Int
       | DoNothing
       | Seq Action Action
       | If Object Action deriving (Show,Eq)
-data Object = Sand | Stone deriving (Show,Eq)
+data Object = Sand | Stone | Empty deriving (Show,Eq)
 
 --Moveto 3 4 'Seq' If Sand Pickup 'Seq' Moveto 0 0 'Seq' Drop
 
@@ -37,9 +40,15 @@ ifStone Sand = False
 --data Robot d a = Robot {device :: d;
 --            schedule :: [Action];}
 
---class Device a where
-  --getInfo String
 
+-- ToDo :Since Robot needs both State and IO effects, we can modularize this as a type class that should have 3 methods: 
+-- 1. getState
+-- 2. putState
+-- 3. IO interaction
+--class (MonadState s m, MonadIO m) => MonadStateIO s m where
+
+-- ToDo: How to add a type constraint like "sensor a" in the data type definition for Robot? 
+-- data (Sensor b) => RobotState b = Robot (Energy, Pos, Load, Schedule, b) 
 type Robot m a = StateT RobotState m a
 type RobotState = (Energy, Pos, Load, Schedule)
 
@@ -47,6 +56,59 @@ type Energy = Int
 type Pos = (Int, Int)
 type Load = Object
 type Schedule = [Action]
+
+--moveTo :: Monad m => Pos -> Robot m ()
+--moveTo i = do
+--  (e,p,l,s)
+
+-- Since all the Sensors should have the same behavior: get data from the real world, it should be like IO Monad. 
+-- we want to use IO Monad to simulate it.
+-- ToDo: 1. a is never used but helps to pass the typechecker
+--       2. Whether there is a nice way?
+class Sensor a where
+  getInfo :: a -> IO String 
+
+instance Sensor Thermometer where
+  getInfo a = getLine
+
+data Thermometer = Thermometer
+
+instance Sensor Hygrometer where
+  getInfo a = getLine
+
+data Hygrometer = Hygrometer
+
+instance Sensor Barometer where
+  getInfo a = getLine
+
+data Barometer = Barometer
+
+instance Sensor Camera where
+  getInfo a = getLine
+
+data Camera = Camera
+
+--run m e as = do 
+--  (a,s) <- runStateT m (e,(0,0),Empty,as)
+
+
+moveBy :: MonadPlus m => (Int, Int) -> Robot m ()
+moveBy (i,j) = do
+  (e,(px,py),l,s) <- get
+  if i+j <e then put (e-i-j,(px+i,py+j),l,s)
+            else lift mzero
+
+pickUp :: MonadPlus m => Object -> Robot m ()
+pickUp o = do
+  (e,p,l,s) <- get
+  if l == Empty then put (e,p,o,s)
+                else lift mzero
+
+drop :: MonadPlus m => Robot m ()
+drop = do
+  (e,p,l,s) <- get
+  put (e,p,Empty,s)
+
 
 getEnergy :: Monad m => Robot m Energy
 getEnergy = do
@@ -105,14 +167,14 @@ peekAction = do
   s <- getSchedule
   case s of
     [] -> return DoNothing
-    _  -> return (head s)
+    (s:ss)  -> return s
 
 removeTopAction :: Monad m => Robot m ()
 removeTopAction = do
   s <- getSchedule
   case s of
     [] -> return ()
-    _ -> setSchedule (tail s)
+    (s:ss) -> setSchedule ss
 
 -- popAction :: Monad m => Robot m (Maybe Action)
 -- popAction = let s = getSchedule in
@@ -122,3 +184,5 @@ removeTopAction = do
 --                   h <- Just (head s)
 --                   --TODO: Remove the top element from the schedule
 --                   h
+
+--runSchedule
