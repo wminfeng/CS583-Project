@@ -4,20 +4,6 @@ import Control.Monad
 import Control.Monad.State
 import Control.Monad.Trans
 
---sem :: Move -> Pos
---sem []      = (0,0)
---sem (Go d i:ms) = (dx*i+x,dy*i+y)
---where
--- (dx,dy) = vector d
--- (x,y)   = sem ms
-
---vector :: Dir -> (Int,Int)
---vector Lft = (-1,0)
---vector Rgt = (1,0)
---vector Up  = (0,1)
---vector Dwn = (0,-1)
-
-
 -- ToDo: Based on the combinator pattern in our lecture, this should be changed to functions that return "Robot m a" as results
 -- Reason: Such implemetation lacks of extensibility
 data Action = Moveto Int Int
@@ -31,14 +17,10 @@ data Action = Moveto Int Int
       | DoNothing
       | Seq Action Action
       | If Object Action deriving (Show,Eq)
+
 data Object = Sand | Stone | Empty deriving (Show,Eq)
 
---Moveto 3 4 'Seq' If Sand Pickup 'Seq' Moveto 0 0 'Seq' Drop
-
 ifStone Sand = False
-
---data Robot d a = Robot {device :: d;
---            schedule :: [Action];}
 
 
 -- ToDo :Since Robot needs both State and IO effects, we can modularize this as a type class that should have 3 methods: 
@@ -51,7 +33,6 @@ ifStone Sand = False
 -- data (Sensor b) => RobotState b = Robot (Energy, Pos, Load, Schedule, b) 
 type Robot m a = StateT RobotState m a
 
---type RobotState = (Energy, Pos, Load, Schedule)
 type Energy = Int
 type Pos = (Int, Int)
 type Load = Object
@@ -113,16 +94,12 @@ camera w = picture w
 
 moveBy :: MonadPlus m => (Int, Int) -> Robot m ()
 moveBy (i,j) = do
---  (e,(px,py),l,s) <- get
---if i+j <e then put (e-i-j,(px+i,py+j),l,s)
   RobotState e (px,py) l s w <- get
   if i+j <e then put (RobotState (e-i-j) (px+i,py+j) l s w)
             else lift mzero
 
 pickUp :: MonadPlus m => Object -> Robot m ()
 pickUp o = do
---  (e,p,l,s) <- get
---if l == Empty then put (e,p,o,s)
   RobotState e p l s w <- get
   if l == Empty then put (RobotState e p o s w)
                 else lift mzero
@@ -136,61 +113,35 @@ drop = do
 
 
 getEnergy :: Monad m => Robot m Energy
---getEnergy = do
---  RobotState e _ _ _ _ <- get
---  return e
 getEnergy = liftM energy get
 
 
 printEnergy :: Robot IO ()
---printEnergy = do
---RobotState e _ _ _ _ <- get
---lift $ putStrLn (show e)
 printEnergy = get >>= (lift.putStrLn.show.energy)
 
 
 getPos :: Monad m => Robot m Pos
---getPos = do
---  RobotState _ p,_,_) <- get
---  return p
 getPos = liftM pos get
 
 printPos :: Robot IO ()
---printPos = do
---  (_,p,_,_) <- get
---  lift $ putStrLn (show p)
 printPos = get >>= (lift.putStrLn.show.pos)
 
 getLoad :: Monad m => Robot m Load
---getLoad = do
---  (_,_,l,_) <- get
---  return l
 getLoad = liftM load get
 
 printLoad :: Robot IO ()
---printLoad = do
---  (_,_,l,_) <- get
---  lift $ putStrLn (show l)
 printLoad = get >>= (lift.putStrLn.show.load)
 
 setSchedule :: Monad m => Schedule -> Robot m ()
 setSchedule s = do
-  --(e,p,l,_) <- get
-  --put (e,p,l,s)
   RobotState e p l _ w <- get
   put (RobotState e p l s w)
 
 getSchedule :: Monad m => Robot m Schedule
---getSchedule = do
---  (_,_,_,s) <- get
---  return s
 getSchedule = liftM schedule get
 
 --TODO fix this
 printSchedule :: Robot IO ()
---printSchedule = do
---  (_,_,_,s) <- get
---  lift $ putStrLn (show s)
 printSchedule = get >>= (lift.putStrLn.show.schedule)
 
 getWorld :: Monad m => Robot m World
@@ -201,9 +152,6 @@ printWorld = get >>= (lift.putStrLn.show.world)
 
 addAction :: Monad m => Action -> Robot m ()
 addAction a = do
---  (e,p,l,s) <- get
---  put (e,p,l,(s ++ [a]))
---  return ()
   RobotState e p l s w <- get
   put (RobotState e p l (s ++ [a]) w)
 
@@ -221,13 +169,11 @@ removeTopAction = do
     [] -> return ()
     (s:ss) -> setSchedule ss
 
---popAction :: Monad m => Robot m (Maybe Action)
---popAction = let s = getSchedule in
---              case s of
---                [] -> Nothing
---                _  -> do
---                  h <- Just (head s)
---                  --TODO: Remove the top element from the schedule
---                  h
+popAction :: Monad m => Robot m Action
+popAction = do 
+  a <- peekAction
+  removeTopAction
+  return a
+                  --TODO: Remove the top element from the schedule
 
 --runSchedule
