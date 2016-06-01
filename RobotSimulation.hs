@@ -106,8 +106,6 @@ pickUp o = do
 
 drop :: MonadPlus m => Robot m ()
 drop = do
---  (e,p,l,s) <- get
---put (e,p,Empty,s)
   RobotState e p l s w <- get
   put (RobotState e p Empty s w)
 
@@ -143,6 +141,10 @@ getSchedule = liftM schedule get
 --TODO fix this
 printSchedule :: Robot IO ()
 printSchedule = get >>= (lift.putStrLn.show.schedule)
+--printSchedule = peekAction >>= (lift.putStrLn.show)
+--printSchedule = getSchedule >>= (lift.putStrLn.show)
+
+
 
 getWorld :: Monad m => Robot m World
 getWorld = liftM world get
@@ -174,6 +176,3 @@ popAction = do
   a <- peekAction
   removeTopAction
   return a
-                  --TODO: Remove the top element from the schedule
-
---runSchedule
