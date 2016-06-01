@@ -18,7 +18,7 @@ import Control.Monad.Trans
 --vector Dwn = (0,-1)
 
 
--- ToDo: Based on the combinator pattern in our lecture, this should be changed to funtions that return "Robot m a" as results
+-- ToDo: Based on the combinator pattern in our lecture, this should be changed to functions that return "Robot m a" as results
 -- Reason: Such implemetation lacks of extensibility
 data Action = Moveto Int Int
       | Pickup
@@ -50,12 +50,31 @@ ifStone Sand = False
 -- ToDo: How to add a type constraint like "sensor a" in the data type definition for Robot? 
 -- data (Sensor b) => RobotState b = Robot (Energy, Pos, Load, Schedule, b) 
 type Robot m a = StateT RobotState m a
-type RobotState = (Energy, Pos, Load, Schedule)
 
+--type RobotState = (Energy, Pos, Load, Schedule)
 type Energy = Int
 type Pos = (Int, Int)
 type Load = Object
 type Schedule = [Action]
+
+data RobotState = RobotState { energy :: Int, pos :: (Int, Int), load :: Object, schedule :: [Action], world :: World }
+
+
+data World = World { temperature :: Int, pressure :: Float, humidity :: Float, picture :: String } deriving Show
+
+type Sensor a = World -> a
+
+thermometer :: Sensor Int
+thermometer w = temperature w
+
+barometer :: Sensor Float
+barometer w = pressure w
+
+hygrometer :: Sensor Float
+hygrometer w = humidity w
+
+camera :: Sensor String
+camera w = picture w
 
 --moveTo :: Monad m => Pos -> Robot m ()
 --moveTo i = do
@@ -65,28 +84,28 @@ type Schedule = [Action]
 -- we want to use IO Monad to simulate it.
 -- ToDo: 1. a is never used but helps to pass the typechecker
 --       2. Whether there is a nice way?
-class Sensor a where
-  getInfo :: a -> IO String 
+--class Sensor a where
+--  getInfo :: a -> IO String 
 
-instance Sensor Thermometer where
-  getInfo a = getLine
+--instance Sensor Thermometer where
+--  getInfo a = getLine
 
-data Thermometer = Thermometer
+--data Thermometer = Thermometer
 
-instance Sensor Hygrometer where
-  getInfo a = getLine
+--instance Sensor Hygrometer where
+--  getInfo a = getLine
 
-data Hygrometer = Hygrometer
+--data Hygrometer = Hygrometer
 
-instance Sensor Barometer where
-  getInfo a = getLine
+--instance Sensor Barometer where
+--  getInfo a = getLine
 
-data Barometer = Barometer
+--data Barometer = Barometer
 
-instance Sensor Camera where
-  getInfo a = getLine
+--instance Sensor Camera where
+--  getInfo a = getLine
 
-data Camera = Camera
+--data Camera = Camera
 
 --run m e as = do 
 --  (a,s) <- runStateT m (e,(0,0),Empty,as)
@@ -94,73 +113,99 @@ data Camera = Camera
 
 moveBy :: MonadPlus m => (Int, Int) -> Robot m ()
 moveBy (i,j) = do
-  (e,(px,py),l,s) <- get
-  if i+j <e then put (e-i-j,(px+i,py+j),l,s)
+--  (e,(px,py),l,s) <- get
+--if i+j <e then put (e-i-j,(px+i,py+j),l,s)
+  RobotState e (px,py) l s w <- get
+  if i+j <e then put (RobotState (e-i-j) (px+i,py+j) l s w)
             else lift mzero
 
 pickUp :: MonadPlus m => Object -> Robot m ()
 pickUp o = do
-  (e,p,l,s) <- get
-  if l == Empty then put (e,p,o,s)
+--  (e,p,l,s) <- get
+--if l == Empty then put (e,p,o,s)
+  RobotState e p l s w <- get
+  if l == Empty then put (RobotState e p o s w)
                 else lift mzero
 
 drop :: MonadPlus m => Robot m ()
 drop = do
-  (e,p,l,s) <- get
-  put (e,p,Empty,s)
+--  (e,p,l,s) <- get
+--put (e,p,Empty,s)
+  RobotState e p l s w <- get
+  put (RobotState e p Empty s w)
 
 
 getEnergy :: Monad m => Robot m Energy
-getEnergy = do
-  (e,_,_,_) <- get
-  return e
+--getEnergy = do
+--  RobotState e _ _ _ _ <- get
+--  return e
+getEnergy = liftM energy get
+
 
 printEnergy :: Robot IO ()
-printEnergy = do
-  (e,_,_,_) <- get
-  lift $ putStrLn (show e)
+--printEnergy = do
+--RobotState e _ _ _ _ <- get
+--lift $ putStrLn (show e)
+printEnergy = get >>= (lift.putStrLn.show.energy)
+
 
 getPos :: Monad m => Robot m Pos
-getPos = do
-  (_,p,_,_) <- get
-  return p
+--getPos = do
+--  RobotState _ p,_,_) <- get
+--  return p
+getPos = liftM pos get
 
 printPos :: Robot IO ()
-printPos = do
-  (_,p,_,_) <- get
-  lift $ putStrLn (show p)
+--printPos = do
+--  (_,p,_,_) <- get
+--  lift $ putStrLn (show p)
+printPos = get >>= (lift.putStrLn.show.pos)
 
 getLoad :: Monad m => Robot m Load
-getLoad = do
-  (_,_,l,_) <- get
-  return l
+--getLoad = do
+--  (_,_,l,_) <- get
+--  return l
+getLoad = liftM load get
 
 printLoad :: Robot IO ()
-printLoad = do
-  (_,_,l,_) <- get
-  lift $ putStrLn (show l)
+--printLoad = do
+--  (_,_,l,_) <- get
+--  lift $ putStrLn (show l)
+printLoad = get >>= (lift.putStrLn.show.load)
 
 setSchedule :: Monad m => Schedule -> Robot m ()
 setSchedule s = do
-  (e,p,l,_) <- get
-  put (e,p,l,s)
+  --(e,p,l,_) <- get
+  --put (e,p,l,s)
+  RobotState e p l _ w <- get
+  put (RobotState e p l s w)
 
 getSchedule :: Monad m => Robot m Schedule
-getSchedule = do
-  (_,_,_,s) <- get
-  return s
+--getSchedule = do
+--  (_,_,_,s) <- get
+--  return s
+getSchedule = liftM schedule get
 
 --TODO fix this
 printSchedule :: Robot IO ()
-printSchedule = do
-  (_,_,_,s) <- get
-  lift $ putStrLn (show s)
+--printSchedule = do
+--  (_,_,_,s) <- get
+--  lift $ putStrLn (show s)
+printSchedule = get >>= (lift.putStrLn.show.schedule)
+
+getWorld :: Monad m => Robot m World
+getWorld = liftM world get
+
+printWorld :: Robot IO ()
+printWorld = get >>= (lift.putStrLn.show.world)
 
 addAction :: Monad m => Action -> Robot m ()
 addAction a = do
-  (e,p,l,s) <- get
-  put (e,p,l,(s ++ [a]))
-  return ()
+--  (e,p,l,s) <- get
+--  put (e,p,l,(s ++ [a]))
+--  return ()
+  RobotState e p l s w <- get
+  put (RobotState e p l (s ++ [a]) w)
 
 peekAction :: Monad m => Robot m Action
 peekAction = do
@@ -176,13 +221,13 @@ removeTopAction = do
     [] -> return ()
     (s:ss) -> setSchedule ss
 
--- popAction :: Monad m => Robot m (Maybe Action)
--- popAction = let s = getSchedule in
---               case s of
---                 [] -> Nothing
---                 _  -> do
---                   h <- Just (head s)
---                   --TODO: Remove the top element from the schedule
---                   h
+--popAction :: Monad m => Robot m (Maybe Action)
+--popAction = let s = getSchedule in
+--              case s of
+--                [] -> Nothing
+--                _  -> do
+--                  h <- Just (head s)
+--                  --TODO: Remove the top element from the schedule
+--                  h
 
 --runSchedule
