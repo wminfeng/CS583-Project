@@ -109,6 +109,10 @@ drop = do
   RobotState e p l s w <- get
   put (RobotState e p Empty s w)
 
+setEnergy :: Monad m => Energy -> Robot m ()
+setEnergy e = do
+  RobotState _ p l s w <- get
+  put (RobotState e p l s w)
 
 getEnergy :: Monad m => Robot m Energy
 getEnergy = liftM energy get
@@ -117,12 +121,21 @@ getEnergy = liftM energy get
 printEnergy :: Robot IO ()
 printEnergy = get >>= (lift . putStrLn . show . energy)
 
+setPos :: Monad m => Pos -> Robot m ()
+setPos p = do
+  RobotState e _ l s w <- get
+  put (RobotState e p l s w)
 
 getPos :: Monad m => Robot m Pos
 getPos = liftM pos get
 
 printPos :: Robot IO ()
 printPos = get >>= (lift . putStrLn . show . pos)
+
+setLoad :: Monad m => Load -> Robot m ()
+setLoad l = do
+  RobotState e p _ s w <- get
+  put (RobotState e p l s w)
 
 getLoad :: Monad m => Robot m Load
 getLoad = liftM load get
@@ -144,7 +157,10 @@ printSchedule = get >>= (lift . putStrLn . show . schedule)
 --printSchedule = peekAction >>= (lift.putStrLn.show)
 --printSchedule = getSchedule >>= (lift.putStrLn.show)
 
-
+setWorld :: Monad m => World -> Robot m ()
+setWorld w = do
+  RobotState e p l s _ <- get
+  put (RobotState e p l s w)
 
 getWorld :: Monad m => Robot m World
 getWorld = liftM world get
