@@ -94,20 +94,24 @@ camera w = picture w
 
 moveBy :: MonadPlus m => (Int, Int) -> Robot m ()
 moveBy (i,j) = do
-  RobotState e (px,py) l s w <- get
-  if i+j <e then put (RobotState (e-i-j) (px+i,py+j) l s w)
-            else lift mzero
+    e <- getEnergy
+    (px,py) <- getPos
+    if i+j < e 
+      then do
+        setEnergy (e-i-j)
+        setPos (px+i, py+j)
+      else 
+        lift mzero
 
 pickUp :: MonadPlus m => Object -> Robot m ()
 pickUp o = do
-  RobotState e p l s w <- get
-  if l == Empty then put (RobotState e p o s w)
+  l <- getLoad
+  if l == Empty then setLoad l
                 else lift mzero
 
 drop :: MonadPlus m => Robot m ()
 drop = do
-  RobotState e p l s w <- get
-  put (RobotState e p Empty s w)
+  setLoad Empty
 
 setEnergy :: Monad m => Energy -> Robot m ()
 setEnergy e = do
