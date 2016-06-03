@@ -115,20 +115,20 @@ getEnergy = liftM energy get
 
 
 printEnergy :: Robot IO ()
-printEnergy = get >>= (lift.putStrLn.show.energy)
+printEnergy = get >>= (lift . putStrLn . show . energy)
 
 
 getPos :: Monad m => Robot m Pos
 getPos = liftM pos get
 
 printPos :: Robot IO ()
-printPos = get >>= (lift.putStrLn.show.pos)
+printPos = get >>= (lift . putStrLn . show . pos)
 
 getLoad :: Monad m => Robot m Load
 getLoad = liftM load get
 
 printLoad :: Robot IO ()
-printLoad = get >>= (lift.putStrLn.show.load)
+printLoad = get >>= (lift . putStrLn . show . load)
 
 setSchedule :: Monad m => Schedule -> Robot m ()
 setSchedule s = do
@@ -140,7 +140,7 @@ getSchedule = liftM schedule get
 
 --TODO fix this
 printSchedule :: Robot IO ()
-printSchedule = get >>= (lift.putStrLn.show.schedule)
+printSchedule = get >>= (lift . putStrLn . show . schedule)
 --printSchedule = peekAction >>= (lift.putStrLn.show)
 --printSchedule = getSchedule >>= (lift.putStrLn.show)
 
