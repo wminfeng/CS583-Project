@@ -3,21 +3,19 @@ module RobotSimulation where
 import Control.Monad
 import Control.Monad.State
 import Control.Monad.Trans
+import Control.Monad.Trans.Maybe
+import Prelude hiding (drop)
+import Password 
 
 -- ToDo: Based on the combinator pattern in our lecture, this should be changed to functions that return "Robot m a" as results
 -- Reason: Such implemetation lacks of extensibility
-data Action = Moveto Int Int
-      | Pickup
+data Action = MoveBy Pos
+      | Pickup Object
       | Drop
-      | GetTemp
-      | GetHumidity
-      | GetPressure
-      | GetPicture
-      | SendBackdata
+      | Getdata
       | DoNothing
-      | Seq Action Action
-      | If Object Action deriving (Show,Eq)
-
+--      | If Object Action 
+      deriving (Show,Eq)
 data Object = Sand | Stone | Empty deriving (Show,Eq)
 
 ifStone Sand = False
@@ -32,16 +30,33 @@ ifStone Sand = False
 -- ToDo: How to add a type constraint like "sensor a" in the data type definition for Robot? 
 -- data (Sensor b) => RobotState b = Robot (Energy, Pos, Load, Schedule, b) 
 type Robot m a = StateT RobotState m a
+type RobotE a = Robot (MaybeT IO) a
+
 
 type Energy = Int
 type Pos = (Int, Int)
 type Load = Object
 type Schedule = [Action]
 
-data RobotState = RobotState { energy :: Int, pos :: (Int, Int), load :: Object, schedule :: [Action], world :: World }
+data RobotState = RobotState { energy :: Energy, pos :: Pos, load :: Load, schedule :: Schedule, world :: World }
+
+instance Show RobotState where
+  show (RobotState e p l s w) = "Current Energy is " ++ show e ++
+                                ".\nCurrent Position is " ++ show p ++
+                                ".\nCurrent Load is " ++ show l ++
+                                ".\nCurrent Schedule is " ++ show s ++
+                                ".\n\n" ++ show w 
 
 
-data World = World { temperature :: Int, pressure :: Float, humidity :: Float, picture :: String } deriving Show
+data World = World { temperature :: Int, pressure :: Float, humidity :: Float, picture :: String }
+
+instance Show World where
+  show (World t p h ph) = "Temperature is " ++ show t ++
+                         ".\nPressure is " ++ show p ++
+                         ".\nHumidity is " ++ show h ++
+                         ".\nPrinting a picture : \n " ++ show ph 
+
+
 
 type Sensor a = World -> a
 
@@ -88,11 +103,32 @@ camera w = picture w
 
 --data Camera = Camera
 
---run m e as = do 
---  (a,s) <- runStateT m (e,(0,0),Empty,as)
+run :: Show a => Energy -> Pos -> RobotE a -> IO ()
+run e p m = do 
+  a <- runMaybeT (runStateT m (RobotState e p Empty [] (World 0 0.0 0.0 "")))
+  case a of
+    Just (a,s) -> putStrLn ("Final state is " ++ show s ++ ".")
+    Nothing -> putStrLn ""
 
+runAction :: Action -> RobotE ()
+runAction (MoveBy p) = moveBy p
+runAction (Pickup o) = pickUp o
+runAction Drop = drop
+runAction Getdata = getWorld >> return ()
+runAction DoNothing = return () 
 
-moveBy :: MonadPlus m => (Int, Int) -> Robot m ()
+runSchedule :: Schedule -> RobotE ()
+runSchedule (a:as) = runAction a >> runSchedule as
+runSchedule _ = return () 
+
+run' :: Energy -> Pos -> Schedule -> IO ()
+run' e p sc = do 
+  a <- runMaybeT (runStateT (runSchedule sc) (RobotState e p Empty [] (World 0 0.0 0.0 "")))
+  case a of
+    Just (a,s) -> putStrLn ("Final state is " ++ show s ++ ".")
+    Nothing -> putStrLn ""
+
+moveBy :: (Int, Int) -> RobotE ()
 moveBy (i,j) = do
     e <- getEnergy
     (px,py) <- getPos
@@ -101,131 +137,193 @@ moveBy (i,j) = do
         setEnergy (e-i-j)
         setPos (px+i, py+j)
       else 
-        lift mzero
+        ((lift.lift.putStrLn) ("Error: Not Enough Energy!" ++ "Current Energy is " ++ show e ++ ", need reCharge 10 ? ") >> 
+        lift newGoodPass >>= 
+                          (\a -> if a == 'Y' 
+                                 then setEnergy (e+10) >> moveBy (i,j)
+                                 else ( get >>= (\currentState -> (lift.lift.putStrLn.show) currentState) >> lift mzero)))
+--  (e,(px,py),l,s) <- get
+--if i+j <e then put (e-i-j,(px+i,py+j),l,s)
+  --RobotState e (px,py) l s w <- get
+  --if i+j <e 
+  --then put (RobotState (e-i-j) (px+i,py+j) l s w)
+  --else  
+  --    ((lift.lift.putStrLn) ("Error: Not Enough Energy!" ++ "Current Energy is " ++ show e ++ ", need reCharge 10 ? ") >> 
+  --     lift newGoodPass >>= 
+  --                        (\a -> if a == 'Y' 
+  --                               then put (RobotState (e+10) (px,py) l s w) >> moveBy (i,j)
+  --                               else ( get >>= (\currentState -> (lift.lift.putStrLn.show) currentState) >> lift mzero)))
 
-pickUp :: MonadPlus m => Object -> Robot m ()
+pickUp :: Object -> RobotE ()
 pickUp o = do
   l <- getLoad
-  if l == Empty then setLoad l
-                else lift mzero
+  if l == Empty then setLoad o
+                else lift . lift . putStrLn $ "Error: Already have an object!"
 
-drop :: MonadPlus m => Robot m ()
+--  (e,p,l,s) <- get
+--if l == Empty then put (e,p,o,s)
+  --RobotState e p l s w <- get
+--  if l == Empty then put (RobotState e p o s w)
+--                else lift.lift.putStrLn $ "Error: Already have an object!"
+
+--stateT maybeT IO
+
+drop :: RobotE ()
 drop = do
   setLoad Empty
 
-setEnergy :: Monad m => Energy -> Robot m ()
+setEnergy :: Energy -> RobotE ()
 setEnergy e = do
   RobotState _ p l s w <- get
   put (RobotState e p l s w)
 
-getEnergy :: Monad m => Robot m Energy
-getEnergy = liftM energy get
+getEnergy :: RobotE Energy
+--getEnergy = do
+--  RobotState e _ _ _ _ <- get
+--  return e
+getEnergy = do
+  e <- liftM energy get
+  lift.lift.putStrLn.show $ e
+  return e
 
+--printEnergy :: Robot IO ()
+----printEnergy = do
+----RobotState e _ _ _ _ <- get
+----lift $ putStrLn (show e)
+--printEnergy = get >>= (lift.putStrLn.show.energy)
 
-printEnergy :: Robot IO ()
-printEnergy = get >>= (lift . putStrLn . show . energy)
-
-setPos :: Monad m => Pos -> Robot m ()
+setPos :: Pos -> RobotE ()
 setPos p = do
   RobotState e _ l s w <- get
   put (RobotState e p l s w)
 
-getPos :: Monad m => Robot m Pos
-getPos = liftM pos get
-
-printPos :: Robot IO ()
-printPos = get >>= (lift . putStrLn . show . pos)
-
-setLoad :: Monad m => Load -> Robot m ()
+setLoad :: Load -> RobotE ()
 setLoad l = do
   RobotState e p _ s w <- get
   put (RobotState e p l s w)
 
-getLoad :: Monad m => Robot m Load
-getLoad = liftM load get
+getPos :: RobotE Pos
+--getPos = do
+--  RobotState _ p,_,_) <- get
+--  return p
+getPos = do
+  p <- liftM pos get
+  lift.lift.putStrLn.show $ p
+  return p
 
-printLoad :: Robot IO ()
-printLoad = get >>= (lift . putStrLn . show . load)
+--printPos :: Robot IO ()
+----printPos = do
+----  (_,p,_,_) <- get
+----  lift $ putStrLn (show p)
+--printPos = get >>= (lift.putStrLn.show.pos)
 
-setSchedule :: Monad m => Schedule -> Robot m ()
+getLoad :: RobotE Load
+--getLoad = do
+--  (_,_,l,_) <- get
+--  return l
+getLoad = do
+  l <- liftM load get
+  lift.lift.putStrLn.show $ l
+  return l
+
+--printLoad :: Robot IO ()
+----printLoad = do
+----  (_,_,l,_) <- get
+----  lift $ putStrLn (show l)
+--printLoad = get >>= (lift.putStrLn.show.load)
+
+setSchedule :: Schedule -> RobotE ()
 setSchedule s = do
   RobotState e p l _ w <- get
   put (RobotState e p l s w)
 
-getSchedule :: Monad m => Robot m Schedule
-getSchedule = liftM schedule get
+getSchedule :: RobotE Schedule
+--getSchedule = do
+--  (_,_,_,s) <- get
+--  return s
+getSchedule = do
+  s <- liftM schedule get
+  lift . lift . putStrLn . show $ s
+  return s
+
 
 --TODO fix this
-printSchedule :: Robot IO ()
-printSchedule = get >>= (lift . putStrLn . show . schedule)
---printSchedule = peekAction >>= (lift.putStrLn.show)
---printSchedule = getSchedule >>= (lift.putStrLn.show)
+--printSchedule :: Robot IO ()
+----printSchedule = do
+----  (_,_,_,s) <- get
+----  lift $ putStrLn (show s)
+--printSchedule = get >>= (lift.putStrLn.show.schedule)
 
-setWorld :: Monad m => World -> Robot m ()
+setWorld :: World -> RobotE ()
 setWorld w = do
   RobotState e p l s _ <- get
   put (RobotState e p l s w)
 
-getWorld :: Monad m => Robot m World
-getWorld = liftM world get
+getWorld :: RobotE World
+getWorld = do
+  w <- liftM world get
+  lift . lift . putStrLn . show $ w
+  return w
 
-printWorld :: Robot IO ()
-printWorld = get >>= (lift.putStrLn.show.world)
 
-addAction :: Monad m => Action -> Robot m ()
+--printWorld :: Robot IO ()
+--printWorld = get >>= (lift.putStrLn.show.world)
+
+addAction :: Action -> RobotE ()
 addAction a = do
   RobotState e p l s w <- get
   put (RobotState e p l (s ++ [a]) w)
 
-peekAction :: Monad m => Robot m Action
+peekAction :: RobotE Action
 peekAction = do
   s <- getSchedule
   case s of
     [] -> return DoNothing
     (s:ss)  -> return s
 
-removeTopAction :: Monad m => Robot m ()
+removeTopAction :: RobotE ()
 removeTopAction = do
   s <- getSchedule
   case s of
     [] -> return ()
     (s:ss) -> setSchedule ss
 
-popAction :: Monad m => Robot m Action
+popAction :: RobotE Action
 popAction = do 
   a <- peekAction
   removeTopAction
   return a
 
-setTemp :: Monad m => Int -> Robot m ()
-setTemp t = do
-  World _ p h pic <- getWorld
-  setWorld (World t p h pic)
+--setTemp :: Monad m => Int -> Robot m ()
+--setTemp t = do
+--  World _ p h pic <- getWorld
+--  setWorld (World t p h pic)
 
-getTemp :: Monad m => Robot m Int
-getTemp = liftM temperature getWorld
+--getTemp :: Monad m => Robot m Int
+--getTemp = liftM temperature getWorld
 
 
-setPressure :: Monad m => Float -> Robot m ()
-setPressure p = do
-  World t _ h pic <- getWorld
-  setWorld (World t p h pic)
+--setPressure :: Monad m => Float -> Robot m ()
+--setPressure p = do
+--  World t _ h pic <- getWorld
+--  setWorld (World t p h pic)
 
-getPressure :: Monad m => Robot m Float
-getPressure = liftM pressure getWorld
+--getPressure :: Monad m => Robot m Float
+--getPressure = liftM pressure getWorld
 
-setHumidity :: Monad m => Float -> Robot m ()
-setHumidity h = do
-  World t p _ pic <- getWorld
-  setWorld (World t p h pic)
+--setHumidity :: Monad m => Float -> Robot m ()
+--setHumidity h = do
+--  World t p _ pic <- getWorld
+--  setWorld (World t p h pic)
 
-getHumidity :: Monad m => Robot m Float
-getHumidity = liftM humidity getWorld
+--getHumidity :: Monad m => Robot m Float
+--getHumidity = liftM humidity getWorld
 
-setPicture :: Monad m => String -> Robot m ()
-setPicture pic = do
-  World t p h _ <- getWorld
-  setWorld (World t p h pic)
+--setPicture :: Monad m => String -> Robot m ()
+--setPicture pic = do
+--  World t p h _ <- getWorld
+--  setWorld (World t p h pic)
 
-getPicture :: Monad m => Robot m String
-getPicture = liftM picture getWorld
+--getPicture :: Monad m => Robot m String
+--getPicture = liftM picture getWorld
+
