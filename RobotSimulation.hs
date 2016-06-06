@@ -294,36 +294,47 @@ popAction = do
   removeTopAction
   return a
 
---setTemp :: Monad m => Int -> Robot m ()
---setTemp t = do
---  World _ p h pic <- getWorld
---  setWorld (World t p h pic)
+setTemp :: Int -> RobotE ()
+setTemp t = do
+  World _ p h pic <- getWorld
+  setWorld (World t p h pic)
 
---getTemp :: Monad m => Robot m Int
---getTemp = liftM temperature getWorld
+getTemp :: RobotE Int
+getTemp = do
+  t <- liftM temperature getWorld
+  lift . lift . putStrLn . show $ t
+  return t
 
+setPressure :: Float -> RobotE ()
+setPressure p = do
+  World t _ h pic <- getWorld
+  setWorld (World t p h pic)
 
---setPressure :: Monad m => Float -> Robot m ()
---setPressure p = do
---  World t _ h pic <- getWorld
---  setWorld (World t p h pic)
+getPressure :: RobotE Float
+getPressure = do
+  p <- liftM pressure getWorld
+  lift . lift . putStrLn . show $ p
+  return p
 
---getPressure :: Monad m => Robot m Float
---getPressure = liftM pressure getWorld
+setHumidity :: Float -> RobotE ()
+setHumidity h = do
+  World t p _ pic <- getWorld
+  setWorld (World t p h pic)
 
---setHumidity :: Monad m => Float -> Robot m ()
---setHumidity h = do
---  World t p _ pic <- getWorld
---  setWorld (World t p h pic)
+getHumidity :: RobotE Float
+getHumidity = do
+  h <- liftM humidity getWorld
+  lift . lift . putStrLn . show $ h
+  return h
 
---getHumidity :: Monad m => Robot m Float
---getHumidity = liftM humidity getWorld
+setPicture :: String -> RobotE ()
+setPicture pic = do
+  World t p h _ <- getWorld
+  setWorld (World t p h pic)
 
---setPicture :: Monad m => String -> Robot m ()
---setPicture pic = do
---  World t p h _ <- getWorld
---  setWorld (World t p h pic)
-
---getPicture :: Monad m => Robot m String
---getPicture = liftM picture getWorld
+getPicture :: RobotE String
+getPicture = do
+  p <- liftM picture getWorld
+  lift . lift . putStrLn . show $ p
+  return p
 
