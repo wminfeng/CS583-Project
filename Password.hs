@@ -28,7 +28,7 @@ getGoodPass = do
 -- | The password was bad, try again.
 tryAgain :: MaybeT IO Char
 tryAgain = do
-  lift $ putStrLn "Wrong input value, please try again."
+  lift $ putStrLn " Wrong input value, please try again."
   getGoodPass
 
 -- | Get a new good password from the user and save it.
