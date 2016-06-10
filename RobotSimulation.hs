@@ -131,11 +131,11 @@ moveBy (i,j) = do
         setEnergy (e- abs i - abs j)
         setPos (px+i, py+j)
       else 
-        ((lift.lift.putStrLn) ("Error: Not Enough Energy!" ++ " Current Energy is " ++ show e ++ ", need reCharge 10 ? ") >> 
+        ((lift . lift . putStrLn) ("Error: Not Enough Energy!" ++ " Current Energy is " ++ show e ++ ", need reCharge 10 ? ") >> 
         lift newGoodPass >>= 
                           (\a -> if a == 'Y' 
                                  then setEnergy (e+10) >> moveBy (i,j)
-                                 else ( get >>= (\currentState -> (lift.lift.putStrLn.show) currentState) >> lift mzero)))
+                                 else ( get >>= (\currentState -> (lift . lift . putStrLn . show) currentState) >> lift mzero)))
 
 -- (e,(px,py),l,s) <- get
 -- if i+j <e then put (e-i-j,(px+i,py+j),l,s)
@@ -180,7 +180,7 @@ getEnergy :: RobotE Energy
 -- return e
 getEnergy = do
   e <- liftM energy get
-  lift.lift.putStrLn.show $ e
+  lift . lift . putStrLn . show $ e
   return e
 
 -- printEnergy :: Robot IO ()
@@ -200,7 +200,7 @@ getPos :: RobotE Pos
 --   return p
 getPos = do
   p <- liftM pos get
-  lift.lift.putStrLn.show $ p
+  lift . lift . putStrLn . show $ p
   return p
 
 -- printPos :: Robot IO ()
@@ -220,7 +220,7 @@ getLoad :: RobotE Load
 --  return l
 getLoad = do
   l <- liftM load get
-  lift.lift.putStrLn.show $ l
+  lift . lift . putStrLn . show $ l
   return l
 
 -- printLoad :: Robot IO ()
