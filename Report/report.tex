@@ -1,0 +1,213 @@
+\documentclass{sig-alternate-05-2015}
+\usepackage{cite}
+\usepackage{amsmath}
+\usepackage{tcolorbox}
+\usepackage{pdfpages}
+\usepackage{hyperref}
+\usepackage{listings}
+
+\newcounter{qcounter}
+
+
+\begin{document}
+
+% Copyright
+\setcopyright{acmcopyright}
+
+% DOI
+\doi{10.475/123_4}
+
+% ISBN
+\isbn{123-4567-24-567/08/06}
+
+%Conference
+\conferenceinfo{RFP '16}{June 9, 2016, Corvallis, OR, USA}
+
+\acmPrice{\$15.00}
+
+\title{RobotLang: A Domain-Specific Language for Land-Roving Robots}
+\subtitle{Final Project Report for the conference on Robotic Function Programming (RFP), Spring 2016}
+
+\numberofauthors{2}
+
+\author{
+\alignauthor
+	Shane McKee\\
+       	\affaddr{Oregon State University}\\
+       	\affaddr{2500 NW Monroe Avenue}\\
+       	\affaddr{Corvallis, Oregon}\\
+       	\email{mckeesh@oregonstate.edu}
+\and
+\alignauthor
+Minfeng Wen\\
+       \affaddr{Oregon State University}\\
+       \affaddr{2500 NW Monroe Avenue}\\
+       \affaddr{Corvallis, Oregon}\\
+       \email{wenm@oregonstate.edu}
+}
+
+\maketitle
+
+\section{Introduction} 
+\subsection{What is the domain?}
+The goal of this project was to implement a simple Domain-Specific Language for a land-roving robot. 
+\subsection{Who are the users?}
+This language allows programmers to control the robot by sending it missions to complete. 
+\subsection{What kinds of things can those users do with your project?}
+Our DSL allows developers to move the robot, keep track of energy and energy usage, and collect samples such as stones and sand. It also provides simple interfaces to access sensor data such as temperature, humidity, atmospheric pressure, and images of surroundings. The DSL is also designed in such a way that adding a new sensor is easy to do. As this project is not implemented with a particular set of hardware in mind, we did not implement any actual data collection code. Users must implement that part of the code themselves and use our code to set values.
+
+\subsection{Are there similar tools/languages that exist already, and if so, how are they different?}
+To our knowledge, there are not any languages that solve this narrow set of requirements. We do know that the Mars Rover and other similar robots must have certain APIs or DSLs to control them, but none seem to be publicly accessible.
+
+\section{Background}
+\subsection{Important types}
+\begin{itemize}
+\item \textbf{Robot}
+Robot is a state monad that allows us to access state information about the robot.
+\item \textbf{RobotE}
+The RobotE monad allows us to combine the Robot state monad with the IO and Maybe monads in order to better handle IO and errors.
+\item \textbf{Energy}
+This type is an integer that represents the energy level of the robot.
+\item \textbf{Pos}
+This type is a pair of integers that represents the current position of the robot.
+\item \textbf{Load}
+This type is an Object that represents a physical object that the robot is carrying.
+\item \textbf{Schedule}
+This type is a list of Actions that represents the list of commands that robot must complete. This could also be called the robot's "Mission".
+\item \textbf{Object}
+Object is a type that represents either Sand, Stone, or and Empty value.
+\item \textbf{Action}
+Action is a type that is represented by the MoveBy function, PickUp function, Drop function, GetData function, and DoNothing.
+\item \textbf{World}
+This data type is used to hold sensory data. This data is not kept over time, as it is expected that the data will be sent back to a server for storage.
+\item \textbf{RobotState}
+This contains information about the state of the robot.
+\end{itemize}
+
+\subsection{Important functions}
+\begin{itemize}
+\item \small run :: Show a $\Rightarrow$ Energy $\rightarrow$ Pos $\rightarrow$ RobotE a $\rightarrow$ IO ()
+Takes three parameters (Energy, Position, and the RobotE monad), runs the actions in the schedule, and prints the final state.
+\item run' :: Energy $\rightarrow$ Pos $\rightarrow$ Schedule $\rightarrow$ IO ()
+Takes three parameters (Energy, Position, and Schedule), runs the actions in the schedule, and prints the final state.
+\item moveBy :: (Int, Int) $\rightarrow$ RobotE ()
+Alters the (x, y) position in the current state and deducts the energy needed to perform the movement. If energy is insufficient, the user is asked if they want to add more energy in order to complete that action.
+\item pickUp :: Object $\rightarrow$ RobotE ()
+Picks up an object if there is nothing in its current load.
+\item drop :: RobotE ()
+Sets the current load to empty.
+\item Other various setter and getter functions
+\end{itemize}
+
+\section{Design}
+\subsection{RobotE}
+The design for RobotE came out of several different iterations of improvements and refactoring. From the beginning, we had the state passed into each function and returned from each function. We soon realized that passing the state around was not ideal, so we implemented the Robot monad, which allowed us to refactor functions without passing the state into and out of each one. After a while, we realized that we needed a way to handle errors and IO, so we combined these monads using Robot as a monad transformer applied to MaybeT IO. The resulting monad was RobotE, which is an improvement over the previous version because we can use state and IO while also being able to handle errors.
+\subsection{Sensors}
+We originally wanted to use a type class because it is easy to extend with new sensors. However, we encountered a problem in trying to do this. We could not understand how to add a type constraint to the type definition for Robot. In the end, our solution to this problem was implementing the World type with record syntax. This allows us to easily add a new sensor by adding a new field name. Since easy extensibility was our reason for using type classes in the first place, we did not see a need to implement Sensor as a type class.
+\subsection{IO}
+Initially, we had designed the code to separate get functionality and print functionality, but we later decided that it would be convenient to combine the getting and printing functions. This required that we combine the Robot and IO monads. The example of getting the Robot energy level is shown below:
+\bigskip
+\hrule
+\begin{lstlisting}
+getEnergy = do
+  e <- liftM energy get
+  lift . lift . putStrLn . show $ e
+  return e
+\end{lstlisting}
+\hrule
+\bigskip
+
+In this case, we can see that we are using both \textit{get} from the Robot monad and \textit{show} from the IO monad. \\
+
+Another case where this is useful is in the \textit{moveBy} function. We use the IO monad for output, to communicate that the robot is out of energy, and for input, to allow the user to choose if more energy should be added (charging the robot) before executing more actions. If the user chooses not to add more energy, it will simply stop executing actions.
+
+\section{Usability}
+This DSL provides many functions and types with which a user can run commands and select robot functions. However, we also have many methods that provide a nice boilerplate in case the user wants to extend our work even further. For instance, we have types with attributes that may be accessed very easily. If users desire to  build more functionality into a robot with an even more specific purpose, they can use those attributes and use our setter and getter functions as a template for how access them. We even provide ways to add, remove, peek, and pop actions from the schedule to provide easy schedule manipulation.
+
+\section{Future Work}
+\subsection{Recharging}
+Currently, the robot recharges a fixed amount only if it runs out of energy while moving. We also have movement being the only action that costs energy. Future work should include adding costs to other actions as well as allowing users to recharge dynamic amounts as its own separate action.
+\subsection{Extend Robot Functionality}
+In future, the DSL should be extended to cover more cases. For instance, adding more Object types, adding more sensors, providing analysis on all of the data collected, and providing a way for the robot to communicate. In addition, we should provide an interface for hardware devices such as thermometers, barometers, etc.
+
+\iffalse
+\section{Introduction}\label{Introduction}
+Collaboration between software developers working on the same project also carries the risk of merge conflicts. With 28.4\% of all projects on Github being non-personal repositories (as of Jan. 2014), the prevalence of merge conflicts is significant \cite{kalliamvakou14}. Since merge conflicts carry a cost to any software project, developers and researchers have pursued ways of mitigating them \cite{niu2012}. But mitigation strategies must be based upon a foundation of understanding both the problem space --- conflicting versions of code --- and the factoring that contribute to their occurrence.
+
+Popular version control systems (git, svn, etc.) have features that allow for the detection of merge conflicts, and can automatically resolve the conflict when it adheres to certain basic patterns of textual conflicts. But when more complex conflicts occur, either in the form of syntactic or semantic conflicts, these version control systems require developer intervention to resolve the conflict. Although several papers have examined how and why merge conflicts occur \cite{brun10}\cite{Sarma08}\cite{Guimaraes12}, little attention has been paid to understanding how developers resolve merge conflicts in practice.
+
+By mining software repositories on Github for instances of merge conflicts, we hope to characterize the patterns that developers take to resolve merge conflicts. When examined across the backdrop of tools in use for managing code, our data will show whether the features of these tools are adequately addressing the needs of software developers collaborating within open-source communities.
+
+\begin{table*}
+\centering
+\caption{Executive Summary}
+\begin{tabular}{| l | p{10cm} | } \hline
+Goal & To understand merge conflict resolution patterns in Git repositories. \\ \hline
+Research Questions  & \textbf{RQ1:} What merge conflict resolution patterns exist in Git?\\
+& \textbf{RQ2:} What is the frequency distribution of merge conflict resolution patterns by programming language?\\
+& \textbf{RQ3:} Is there a relationship between the size of the conflict and its conflict resolution pattern?\\ \hline
+Empirical Method & This project will use data mining. Data mining is best for RQ1 because it will give us the least biased view of what developers do to resolve conflicts in practice. It is best for RQ2 because It will allow us to get a sample across a wide variety of languages while testing for certain resolution patterns. It is best for RQ3 because it is easy to extract the size of a conflicted area and compare it to the type of merge conflict resolution that was used.\\ \hline
+Data Collected & Number of merges, number of merge conflicts, size of each conflict, pattern used in each resolution, primary programming language of each project, author of each original commit, parent commit, and merged commit\\
+\hline\end{tabular}
+\label{table:t1}
+\end{table*}
+
+\section{Background}\label{Background}
+
+The underlying structure of version control systems affects the ways in which people interact with them. In this project, we focus on one aspect of the interactions with version control systems, but we provide a brief introduction to the structure as a background to our work.
+
+Modern version control systems base their representations of code, and the underlying changes upon it, on graph theory. These models provide an entire family of models and methods for evaluating and attempting to resolve merge conflicts, but are limited either by the bounds of a particular model or the accuracy of its heuristics \cite{ehrig15} \cite{mens99}. We base our assumption that certain merge conflicts cannot be resolved by version control systems, and thus require human intervention, on these fundamental limitations in graph modeling.
+
+Merge algorithms are an area of active research, and consequently there are many different approaches to automatic merging, with subtle differences. The more notable merge algorithms include three-way merge \cite{livshits07}, recursive three-way merge, fuzzy patch application \cite{brunet06}, weave merge \cite{nguyen07}, and patch commutation. These concepts form both a model of understanding and a lens for us to examine the differences between the theoretical models and real-world application.
+
+Our research is guided by prior work into conflict detection and automated conflict resolution. Brun, et al. \cite{brun11}, ML Guim\~{a}raes, et al. \cite{Guimaraes12}, C Schneider, et al. \cite{schneider04}, and Dewan et al. \cite{dewan07} have all attempted to locate current and upcoming merge conflicts as early as possible in order to prevent them from occurring. We take the approach that some conflicts cannot be detected either by collaborator awareness or by proactively engaging automated merging tools, and that understanding how developers currently adapt to such situations is fundamental to developing tools that support such situations.\\
+
+\section{Study Design}\label{design}
+\subsection{Aspects of software development considered} 
+\subsubsection{Motivations}
+Merge conflicts have become a popular area of study, perhaps due to the importance of version control in the developer workflow or developers' dislike for resolving messy merge conflicts. Resolving a merge conflict can require extra time to understand how the two sets of new code should be integrated together.
+\subsection{Dataset}
+Our data will be selected from open-source projects on GitHub. This publicly accessible data is convenient, but it does run the risk of results not being sufficiently generalizable to private code repositories. We will gather the following data:
+\begin{enumerate}
+\item \textbf{Number of merges}\\
+	This is the total number of merges, both automatically and manually merged. The intent is to identify what percentage the merges in our corpus must be manually merged.
+\item \textbf{Number of merge conflicts}\\
+	This is the number of merge conflicts that can be found using Git and GitPython. This will limit us to textual merge conflicits.
+\item \textbf{Size of each conflict}\\
+	We will determine the size of a conflict between commit A and commit B by the following equation:\\ 
+	$$\text{SLOC}(\text{git diff}(Original, A))$$
+	$$+$$
+	$$\text{SLOC}(\text{git diff}(Original, B))$$
+\item \textbf{Pattern used to resolve each conflict}\\
+	To illustrate the patterns, we use the following scenario: Suppose User A attempts to merge Branch B into Branch A. Also assume that a merge conflict arises between Commit A in Branch A and Commit B in Branch B. Which of the following patterns, if any, did the developer use to solve the merge conflict?
+	\begin{enumerate}
+	\item\textit{Deference:} User A removes code provided by Commit A, accepting only code from Commit B.
+	\item\textit{Disregard:} User A removes code provided by Commit B, accepting only code from Commit A.
+	\item\textit{Interweaving:} Accepting code from both commits and interweaving the conflicting code.
+	\item\textit{Augmentation:} Interweaving code from both commits and adding additional code to fix semantic conflicts.
+	\end{enumerate}
+\item \textbf{Primary programming language of each project}\\
+Primary language is determined based on GitHub's internal analysis, which is determined by the prevalence of the language in the project.
+\item \textbf{Author of each original commit, conflicting commits, and merged commit}\\
+We use Git's metadata for each commit to determine the author.
+\end{enumerate}
+
+\subsection{Data Gathering and Analysis}
+Our dataset will be comprised of project metadata and commits particular to instances of merge conflicts. This dataset will be gathered from Github using the GitPython tool in two phases: (1) initial discovery, and (2) scaled evaluation.
+
+Phase 1 will be targeted at gathering the project metadata and commits associated with merges, via the parent identification features of GitPython. We will then gather both of the conflicting commits, their shared parent commit, and the downstream merge commit. This phase will also coincide with the Mining Software Repositories assignment and will last for approximately 4-5 days.
+
+Phase 2 will be similar to phase 1 in the types of data targeted, but will include any revisions to the mining algorithm or models as needed. This phase will last for at least 10 days with the goal of gathering a large dataset that can provide insight into our research questions.
+
+The resulting dataset will require manual pruning to remove any false positives; i.e. empty merges and non-conflicting merges. We hope to overcome these issues through tighter modeling in our mining algorithm for phase 2. We will analyze the dataset using R to gather information from each of the collected files and aggregating results to be used in statistical analysis.
+
+Our study will be limited by both space and time. Since we must store the project metadata and each target commit while mining a Github repository, and retain any set of commits that are determined to be merges, we will be bound by the storage capacity of the system we use. The constraints of the term also introduces a time limitation to our project, but we should be able to mine a large enough dataset for determining initial results.
+
+\section{Formative Results}\label{Results}
+Though we have not yet collected any mining data, we do have an understanding of what characteristics we should expect to see. Outside of this project, one researcher has interviewed 9 software engineers about the types of merge conflicts that they encounter and how they resolve them. This has provided a better understanding about the type of data that we are looking for during the repository mining.
+
+\bibliography{references}{}
+\bibliographystyle{plain}
+\fi
+
+\end{document}
