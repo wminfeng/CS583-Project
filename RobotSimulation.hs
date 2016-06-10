@@ -46,7 +46,6 @@ instance Show RobotState where
   show (RobotState e p l s w) = "\nCurrent Energy is " ++ show e ++
                                 ".\nCurrent Position is " ++ show p ++
                                 ".\nCurrent Load is " ++ show l ++
-                                ".\nCurrent Schedule is " ++ show s ++
                                 ".\n" ++ show w 
 
 data World = World { temperature :: Int, pressure :: Float, humidity :: Float, picture :: String }
@@ -127,9 +126,9 @@ moveBy :: (Int, Int) -> RobotE ()
 moveBy (i,j) = do
     e <- getEnergy
     (px,py) <- getPos
-    if i+j < e 
+    if abs i + abs j < e 
       then do
-        setEnergy (e-i-j)
+        setEnergy (e- abs i - abs j)
         setPos (px+i, py+j)
       else 
         ((lift.lift.putStrLn) ("Error: Not Enough Energy!" ++ " Current Energy is " ++ show e ++ ", need reCharge 10 ? ") >> 
@@ -352,7 +351,6 @@ getPicture = do
 -- Current Energy is 10.
 -- Current Position is (11,11).
 -- Current Load is Sand.
--- Current Schedule is [].
 -- Temperature is 0.
 -- Pressure is 0.0.
 -- Humidity is 0.0.
@@ -374,7 +372,6 @@ getPicture = do
 -- Current Energy is 2.
 -- Current Position is (10,10).
 -- Current Load is Sand.
--- Current Schedule is [].
 -- Temperature is 0.
 -- Pressure is 0.0.
 -- Humidity is 0.0.
@@ -395,7 +392,6 @@ getPicture = do
 -- Current Energy is 6.
 -- Current Position is (8,8).
 -- Current Load is Empty.
--- Current Schedule is [].
 -- Temperature is 0.
 -- Pressure is 0.0.
 -- Humidity is 0.0.
